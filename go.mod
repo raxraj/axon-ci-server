@@ -6,6 +6,7 @@ toolchain go1.23.9
 
 require (
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
+	github.com/go-resty/resty/v2 v2.16.5 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/labstack/echo/v4 v4.13.4 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect

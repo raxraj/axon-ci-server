@@ -66,7 +66,7 @@ func OAuthCallback(c echo.Context) error {
 	if resp.IsError() {
 		return c.JSON(resp.StatusCode(), map[string]map[string]string{
 			"data": {
-				"message": "GitHub returned error",
+				"message": "GitHub returned error: " + resp.String(),
 			},
 		})
 	}
@@ -78,7 +78,7 @@ func OAuthCallback(c echo.Context) error {
 		})
 	}
 
-	print(result.AccessToken)
+	// Removed printing of access token to prevent sensitive credential exposure.
 
 	return c.JSON(http.StatusOK, map[string]map[string]string{
 		"data": {

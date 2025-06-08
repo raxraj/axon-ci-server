@@ -11,4 +11,5 @@ func Routes(e *echo.Group) {
 
 	// User Routes
 	Router.GET("/OAuthURL", users.OAuthInitiate)
+	Router.GET("/OAuthCallback", users.OAuthCallback)
 }

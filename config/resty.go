@@ -16,5 +16,5 @@ func init() {
 		SetRetryCount(3).
 		SetRetryWaitTime(1000).
 		SetRetryMaxWaitTime(5000).
-		SetTimeout(30 * 1000) // 30 seconds timeout
+		SetTimeout(30 * time.Second) // 30 seconds timeout
 }

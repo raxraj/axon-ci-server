@@ -1,11 +1,13 @@
 package users
 
 import (
-	"github.com/go-resty/resty/v2"
-	"github.com/labstack/echo/v4"
-	"github.com/spf13/viper"
 	"net/http"
 	"net/url"
+
+	"github.com/labstack/echo/v4"
+	"github.com/raxraj/axon-ci-server/config"
+	"github.com/raxraj/axon-ci-server/controllers"
+	"github.com/spf13/viper"
 )
 
 func OAuthInitiate(c echo.Context) error {
@@ -19,11 +21,11 @@ func OAuthInitiate(c echo.Context) error {
 	authorizationUri := "https://github.com/login/oauth/authorize" + "?" + params.Encode()
 
 	// Return the URL to the user in json
-	return c.JSON(http.StatusOK, map[string]map[string]string{
-		"data": {
-			"url":     authorizationUri,
-			"message": "Please visit this URL to authorize the application with GitHub.",
+	return c.JSON(http.StatusOK, controllers.SuccessResponse{
+		Data: map[string]interface{}{
+			"authorization_url": authorizationUri,
 		},
+		Message: "Please visit this URL to authorize the application with GitHub.",
 	})
 }
 
@@ -36,16 +38,15 @@ type tokenResp struct {
 func OAuthCallback(c echo.Context) error {
 	code := c.QueryParam("code")
 	if code == "" {
-		return c.JSON(http.StatusBadRequest, map[string]map[string]string{
-			"data": {
-				"message": "missing code",
-			},
+		return c.JSON(http.StatusBadRequest, controllers.ErrorResponse{
+			Message:   "Missing code",
+			Data:      nil,
+			ErrorCode: nil,
 		})
 	}
 
-	client := resty.New()
 	result := &tokenResp{}
-	resp, err := client.R().
+	resp, err := config.RestClient.R().
 		SetHeader("Accept", "application/json").
 		SetFormData(map[string]string{
 			"client_id":     viper.GetString("github.client_id"),
@@ -57,32 +58,31 @@ func OAuthCallback(c echo.Context) error {
 		Post("https://github.com/login/oauth/access_token")
 
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]map[string]string{
-			"data": {
-				"message": "failed to get access token",
-			},
+		return c.JSON(http.StatusInternalServerError, controllers.ErrorResponse{
+			Message:   "failed to get access token",
+			Data:      nil,
+			ErrorCode: nil,
 		})
 	}
 	if resp.IsError() {
-		return c.JSON(resp.StatusCode(), map[string]map[string]string{
-			"data": {
-				"message": "GitHub returned error: " + resp.String(),
-			},
+		return c.JSON(resp.StatusCode(), controllers.ErrorResponse{
+			Message:   "GitHub returned error: " + resp.String(),
+			Data:      nil,
+			ErrorCode: nil,
 		})
 	}
 	if result.AccessToken == "" {
-		return c.JSON(http.StatusInternalServerError, map[string]map[string]string{
-			"data": {
-				"message": "no access token received",
-			},
+		return c.JSON(http.StatusInternalServerError, controllers.ErrorResponse{
+			Message:   "no access token received",
+			Data:      nil,
+			ErrorCode: nil,
 		})
 	}
 
 	// Removed printing of access token to prevent sensitive credential exposure.
 
-	return c.JSON(http.StatusOK, map[string]map[string]string{
-		"data": {
-			"message": "OAuth flow completed successfully. You are now being redirected.",
-		},
+	return c.JSON(http.StatusOK, controllers.SuccessResponse{
+		Message: "OAuth flow completed successfully. You are now being redirected.",
+		Data:    nil,
 	})
 }

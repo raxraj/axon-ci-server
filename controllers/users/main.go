@@ -3,12 +3,23 @@ package users
 import (
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/raxraj/axon-ci-server/config"
 	"github.com/raxraj/axon-ci-server/controllers"
 	"github.com/spf13/viper"
 )
+
+var (
+	userService *UserService
+)
+
+func init() {
+	userStorage := NewInMemoryUserStorage()
+	sessionStorage := NewInMemorySessionStorage()
+	userService = NewUserService(userStorage, sessionStorage)
+}
 
 func OAuthInitiate(c echo.Context) error {
 	// This function would typically initiate an OAuth flow for GitHub.
@@ -45,6 +56,7 @@ func OAuthCallback(c echo.Context) error {
 		})
 	}
 
+	// Exchange code for access token
 	result := &tokenResp{}
 	resp, err := config.RestClient.R().
 		SetHeader("Accept", "application/json").
@@ -79,10 +91,108 @@ func OAuthCallback(c echo.Context) error {
 		})
 	}
 
-	// Removed printing of access token to prevent sensitive credential exposure.
+	// Create or login user using the access token
+	user, session, err := userService.CreateOrLoginUser(result.AccessToken)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, controllers.ErrorResponse{
+			Message:   "failed to create or login user: " + err.Error(),
+			Data:      nil,
+			ErrorCode: nil,
+		})
+	}
+
+	// Set session cookie for secure session management
+	cookie := &http.Cookie{
+		Name:     "session",
+		Value:    session.ID,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: http.SameSiteLaxMode,
+		Expires:  session.ExpiresAt,
+	}
+	c.SetCookie(cookie)
+
+	// Return success response with user info (without sensitive data)
+	return c.JSON(http.StatusOK, controllers.SuccessResponse{
+		Message: "OAuth flow completed successfully. User authenticated.",
+		Data: map[string]interface{}{
+			"user": map[string]interface{}{
+				"id":         user.ID,
+				"login":      user.Login,
+				"name":       user.Name,
+				"email":      user.Email,
+				"avatar_url": user.AvatarURL,
+				"html_url":   user.HTMLURL,
+				"created_at": user.CreatedAt,
+			},
+			"session_expires_at": session.ExpiresAt,
+		},
+	})
+}
+
+// GetCurrentUser returns the current authenticated user
+func GetCurrentUser(c echo.Context) error {
+	cookie, err := c.Cookie("session")
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, controllers.ErrorResponse{
+			Message:   "no session found",
+			Data:      nil,
+			ErrorCode: nil,
+		})
+	}
+
+	user, err := userService.GetUserBySession(cookie.Value)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, controllers.ErrorResponse{
+			Message:   "invalid or expired session",
+			Data:      nil,
+			ErrorCode: nil,
+		})
+	}
 
 	return c.JSON(http.StatusOK, controllers.SuccessResponse{
-		Message: "OAuth flow completed successfully. You are now being redirected.",
+		Message: "User retrieved successfully",
+		Data: map[string]interface{}{
+			"user": map[string]interface{}{
+				"id":         user.ID,
+				"login":      user.Login,
+				"name":       user.Name,
+				"email":      user.Email,
+				"avatar_url": user.AvatarURL,
+				"html_url":   user.HTMLURL,
+				"created_at": user.CreatedAt,
+			},
+		},
+	})
+}
+
+// Logout invalidates the current session
+func Logout(c echo.Context) error {
+	cookie, err := c.Cookie("session")
+	if err != nil {
+		return c.JSON(http.StatusOK, controllers.SuccessResponse{
+			Message: "logged out successfully",
+			Data:    nil,
+		})
+	}
+
+	// Invalidate session
+	userService.InvalidateSession(cookie.Value)
+
+	// Clear the session cookie
+	clearCookie := &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+	}
+	c.SetCookie(clearCookie)
+
+	return c.JSON(http.StatusOK, controllers.SuccessResponse{
+		Message: "logged out successfully",
 		Data:    nil,
 	})
 }

@@ -3,5 +3,6 @@ port: 8000
 github:
   client_id: "your_client_id"
   client_secret: "your_client_secret"
-  redirect_uri: "http://localhost:8000/auth/github/callback"
+  redirect_uri: "http://localhost:8000/v1/users/OAuthCallback"
+  scope: "user:email"
   state: "random_state"

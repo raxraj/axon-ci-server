@@ -1,6 +1,8 @@
 package config
 
 import (
+	"time"
+
 	"github.com/go-resty/resty/v2"
 )
 

@@ -12,6 +12,6 @@ func InitConfig() {
 
 	err := viper.ReadInConfig()
 	if err != nil {
-		log.Fatalf("fatal error config file: %w", err)
+		log.Fatalf("fatal error config file: %v", err)
 	}
 }
